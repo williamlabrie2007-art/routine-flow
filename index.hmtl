@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050506;
+      --surface: rgba(255,255,255,0.04);
+      --surface-strong: rgba(255,255,255,0.08);
+      --text-primary: #FAFAFA;
+      --text-secondary: #B8B6B0;
+      --text-tertiary: #76746E;
+      --success: #6BE3A4;
+      --warning: #F2C063;
+      --danger: #FF6B6B;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16) 0, transparent 32%),
+                  radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06) 0, transparent 28%),
+                  var(--bg);
+      color: var(--text-primary);
+      font-family: var(--sans);
+      line-height: 1.5;
+      padding: env(safe-area-inset-top) 20px 60px;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+      background-size: 3px 3px;
+      opacity: 0.7;
+      mix-blend-mode: overlay;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: inherit;
+      filter: blur(40px);
+      animation: drift 36s ease-in-out infinite alternate;
+      opacity: 0.85;
+      z-index: -1;
+    }
+
+    @keyframes drift {
+      from { transform: translate(-2%, -2%); }
+      to { transform: translate(2%, 2%); }
+    }
+
+    .page {
+      width: min(1100px, 100%);
+      margin: 0 auto;
+    }
+
+    h1.dash-title {
+      margin: 0 0 14px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .ticker-row {
+      margin-bottom: 18px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .goal-ticker {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.30) 100%);
+      background-image: linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.30) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .goal-ticker::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      left: -40%;
+      width: 30%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+      animation: ticker-sweep 8s linear infinite;
+    }
+
+    @keyframes ticker-sweep {
+      from { left: -40%; }
+      to { left: 110%; }
+    }
+
+    .goal-ticker-led {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+    }
+
+    .goal-ticker-led-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px rgba(107,227,164,0.7);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(0.85); opacity: 0.45; }
+    }
+
+    .goal-ticker-label {
+      color: var(--text-tertiary);
+      font-family: var(--mono);
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .goal-ticker-stage {
+      flex: 1;
+      min-width: 0;
+      height: 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .goal-ticker-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: absolute;
+      inset: 0;
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      padding-right: 10px;
+      min-width: 100%;
+    }
+
+    .goal-ticker-status {
+      width: 18px;
+      display: inline-flex;
+      justify-content: center;
+      color: var(--text-tertiary);
+    }
+
+    .goal-ticker-status[data-status="done"] { color: var(--success); }
+    .goal-ticker-status[data-status="pending"] { color: var(--text-primary); }
+
+    .goal-ticker-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .goal-ticker-meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      white-space: nowrap;
+    }
+
+    .goal-ticker-row.is-entering { animation: ticker-enter 0.45s cubic-bezier(0.22,1,0.36,1) forwards; }
+    .goal-ticker-row.is-leaving { animation: ticker-leave 0.45s cubic-bezier(0.55,0,0.55,1) forwards; }
+
+    @keyframes ticker-enter {
+      from { opacity: 0; transform: translateY(100%); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes ticker-leave {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-100%); }
+    }
+
+    .day-ring-wrap {
+      display: flex;
+      align-items: center;
+      gap: 26px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+
+    .ring-card {
+      width: 168px;
+      min-width: 168px;
+      height: 168px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,0.04);
+      border-radius: 22px;
+      backdrop-filter: blur(24px) saturate(1.2);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    }
+
+    .ring-card svg { width: 100%; height: 100%; }
+    .ring-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .ring-value {
+      font-size: 40px;
+      font-weight: 800;
+      font-family: var(--mono);
+      letter-spacing: -0.04em;
+      margin: 0;
+    }
+
+    .ring-phase {
+      margin: 5px 0 0;
+      font-size: 9.5px;
+      font-family: var(--mono);
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      color: var(--text-tertiary);
+    }
+
+    .ring-clock {
+      margin: 8px 0 0;
+      font-size: 10.5px;
+      font-family: var(--mono);
+      color: var(--text-tertiary);
+    }
+
+    .ring-sidebar {
+      min-width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: var(--text-primary);
+    }
+
+    .ring-sidebar p { margin: 0; }
+    .ring-status { font-size: 14px; font-weight: 700; }
+    .ring-remaining { font-size: 12px; font-family: var(--mono); color: var(--text-secondary); }
+    .ring-window { font-size: 11px; font-family: var(--mono); color: var(--text-tertiary); }
+
+    .section {
+      display: grid;
+      gap: 20px;
+    }
+
+    .section-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-title::before,
+    .section-title::after {
+      content: '';
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      opacity: 0.6;
+    }
+
+    .section-title::before { width: 18px; }
+    .section-title::after { flex: 1; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+    .gm-card {
+      padding: 22px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(24px) saturate(1.2);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+      display: grid;
+      gap: 18px;
+    }
+
+    .gm-header {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
+
+    .gm-left {
+      min-width: 180px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .gm-eyebrow { font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); }
+    .gm-progress-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .gm-progress-num { font-size: 42px; font-weight: 700; letter-spacing: -0.045em; font-family: var(--mono); }
+    .gm-progress-total { font-size: 18px; font-family: var(--mono); color: var(--text-tertiary); }
+    .gm-progress-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--text-tertiary); text-transform: uppercase; }
+
+    .gm-streak {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text-tertiary);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .gm-streak.active {
+      background: rgba(242,192,99,0.10);
+      color: var(--warning);
+      border-color: rgba(242,192,99,0.32);
+      filter: drop-shadow(0 0 6px rgba(242,192,99,0.6));
+    }
+
+    .gm-streak span { font-family: var(--mono); font-weight: 700; }
+
+    .gm-bar {
+      display: flex;
+      gap: 4px;
+      height: 6px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .gm-bar-seg {
+      flex: 1;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      min-width: 0;
+    }
+
+    .gm-bar-seg-done {
+      background: var(--success);
+      box-shadow: 0 0 6px rgba(107,227,164,0.4);
+    }
+
+    .gm-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .empty-state { font-size: 12px; color: var(--text-tertiary); font-style: italic; text-align: center; padding: 14px 0; }
+
+    .goal-row {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      transition: background 0.2s ease;
+      position: relative;
+    }
+
+    .goal-row:hover { background: rgba(255,255,255,0.06); }
+
+    .goal-handle { width: 14px; text-align: center; opacity: 0; transition: opacity 0.2s ease; cursor: grab; }
+    .goal-row:hover .goal-handle { opacity: 1; }
+
+    .goal-checkbox {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      border: 1.5px solid rgba(255,255,255,0.18);
+      background: rgba(0,0,0,0.24);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .goal-checkbox.checked {
+      background: var(--success);
+      box-shadow: 0 0 12px rgba(107,227,164,0.4);
+    }
+
+    .goal-checkbox::after {
+      content: '';
+      width: 8px;
+      height: 12px;
+      border-right: 2px solid white;
+      border-bottom: 2px solid white;
+      transform: rotate(45deg) scale(0);
+      opacity: 0;
+      transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease;
+    }
+
+    .goal-checkbox.checked::after { transform: rotate(45deg) scale(1); opacity: 1; }
+
+    .goal-text {
+      font-size: 14px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--text-primary);
+      cursor: text;
+    }
+
+    .goal-text[contenteditable="true"] {
+      outline: 1px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      padding: 2px 4px;
+    }
+
+    .goal-row.done { opacity: 0.45; background: rgba(107,227,164,0.04); }
+    .goal-row.done .goal-text { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
+
+    .goal-row.queued { background: rgba(242,192,99,0.10); }
+    .goal-row.queued .goal-text { color: #FFE2A8; }
+
+    .gm-queue-btn,
+    .goal-delete,
+    button.add-btn,
+    button.polish-btn,
+    button.action-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .gm-queue-btn { color: var(--text-tertiary); background: transparent; opacity: 0.65; }
+    .gm-queue-btn.active { color: var(--warning); box-shadow: 0 0 4px rgba(242,192,99,0.65); }
+
+    .goal-delete { color: var(--text-tertiary); background: transparent; opacity: 0.7; }
+    .goal-row:hover .goal-delete { opacity: 1; }
+    .goal-delete:hover { color: var(--danger); }
+
+    .gm-add-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .gm-add-row input {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 11px 14px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .gm-add-row input:focus { outline: 2px solid rgba(255,255,255,0.18); }
+
+    .add-btn {
+      background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%);
+      color: #0A0A0B;
+      font-weight: 700;
+      padding: 11px 18px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+
+    .add-btn:hover { transform: translateY(-1px); }
+
+    .polish-btn {
+      background: rgba(255,255,255,0.04);
+      color: var(--text-primary);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .status-text { font-size: 11px; color: var(--text-tertiary); min-height: 18px; }
+
+    .push-btn {
+      width: 100%;
+      border: 1px dashed rgba(255,255,255,0.24);
+      color: var(--text-primary);
+      background: transparent;
+      padding: 12px 14px;
+      border-radius: 14px;
+      cursor: pointer;
+    }
+
+    .push-btn:hover { background: rgba(255,255,255,0.05); }
+
+    .show-more {
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      border: 1px dashed rgba(255,255,255,0.18);
+      border-radius: 12px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .show-more:hover { background: rgba(255,255,255,0.04); }
+
+    @media (max-width: 480px) {
+      body { padding: env(safe-area-inset-top) 16px 40px; }
+      h1.dash-title { font-size: 22px; }
+      .goal-ticker { padding: 9px 12px; }
+      .goal-ticker-label { font-size: 9px; letter-spacing: 0.14em; }
+      .goal-ticker-row { font-size: 12px; }
+      .goal-ticker-meta { font-size: 10px; padding: 3px 7px; }
+      .ring-card { width: 144px; height: 144px; }
+      .ring-value { font-size: 32px; }
+      .ring-status { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1 class="dash-title">My Dashboard</h1>
+    <div class="ticker-row">
+      <div class="goal-ticker" id="goalTicker" aria-live="polite" aria-atomic="true">
+        <div class="goal-ticker-led"><span class="goal-ticker-led-dot"></span></div>
+        <div class="goal-ticker-label">GOALS</div>
+        <div class="goal-ticker-stage" id="goalTickerStage">
+          <div class="goal-ticker-row">
+            <span class="goal-ticker-status" data-status="">·</span>
+            <span class="goal-ticker-text">Loading…</span>
+          </div>
+        </div>
+        <div class="goal-ticker-meta" id="goalTickerMeta">0/0</div>
+      </div>
+    </div>
+
+    <div class="day-ring-wrap">
+      <div class="ring-card">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <defs>
+            <filter id="glow"><feGaussianBlur stdDeviation="3" result="coloredBlur"/></filter>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8" />
+          <circle id="ringProgress" cx="60" cy="60" r="52" fill="none" stroke="#F2C063" stroke-width="8" stroke-linecap="round" stroke-dasharray="326.7256" stroke-dashoffset="326.7256" transform="rotate(-90 60 60)" filter="url(#glow)" style="transition: stroke 0.7s cubic-bezier(0.22,1,0.36,1), stroke-dashoffset 0.7s cubic-bezier(0.22,1,0.36,1);" />
+        </svg>
+        <div class="ring-inner">
+          <p class="ring-value" id="ringPercent">0%</p>
+          <p class="ring-phase" id="ringPhase">SLEEPING</p>
+          <p class="ring-clock" id="ringClock">--:--</p>
+        </div>
+      </div>
+      <div class="ring-sidebar">
+        <p class="ring-status" id="ringStatus">Still sleeping</p>
+        <p class="ring-remaining" id="ringRemaining">-- until wake-up</p>
+        <p class="ring-window">8:00 AM – 12:00 AM</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">To Do List</div>
+
+      <div class="gm-card" id="todayCard">
+        <div class="gm-header">
+          <div class="gm-left">
+            <div class="gm-eyebrow" id="todayLabel">Today — --</div>
+            <div class="gm-progress-row">
+              <div class="gm-progress-num" id="gmProgressNum">0</div>
+              <div class="gm-progress-total" id="gmProgressTotal">/ 0</div>
+              <div class="gm-progress-label" id="gmProgressLabel">no goals yet</div>
+            </div>
+          </div>
+          <div class="gm-streak" id="gmStreak"><span>⚡</span><span id="gmStreakNum">0</span><span>day streak</span></div>
+        </div>
+        <div class="gm-bar" id="gmBar"></div>
+        <ul id="goalList" class="goal-list gm-list"></ul>
+        <div id="emptyState" class="empty-state">No goals for today yet — add one below.</div>
+        <button class="push-btn" id="pushRemainingBtn" hidden>Push remaining to tomorrow</button>
+        <div class="gm-add-row">
+          <input id="goalInput" placeholder="Add a goal for today…" autocomplete="off" />
+          <button class="add-btn" id="goalAddBtn">+ Add</button>
+          <button class="polish-btn" id="goalPolishBtn">✨ Polish</button>
+        </div>
+        <div class="status-text" id="polishStatus"></div>
+      </div>
+
+      <div class="gm-card" id="tomorrowCard">
+        <div class="gm-header">
+          <div class="gm-left">
+            <div class="gm-eyebrow" id="tomorrowLabel">Plan tomorrow — --</div>
+            <div style="font-size:12px;color:var(--text-tertiary);">Write tonight, locked until 6 AM.</div>
+          </div>
+          <div class="gm-streak" id="gmTomorrowCount" style="background: rgba(255,255,255,0.04); color: var(--text-tertiary); border-color: rgba(255,255,255,0.08);">0 planned</div>
+        </div>
+        <ul id="tomorrowList" class="goal-list gm-list"></ul>
+        <div id="tomorrowEmpty" class="empty-state">Nothing planned for tomorrow yet.</div>
+        <div class="gm-add-row">
+          <input id="tomorrowInput" placeholder="Add a goal for tomorrow…" autocomplete="off" />
+          <button class="add-btn" id="tomorrowAddBtn">+ Add</button>
+          <button class="polish-btn" id="tomorrowPolishBtn">✨ Polish</button>
+        </div>
+        <div class="status-text" id="tomorrowStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ANTHROPIC_API_KEY = '';
+    const WAKE_HOUR = 8;
+    const SLEEP_HOUR = 24;
+    const DAY_BOUNDARY = 6;
+    const ring = document.getElementById('ringProgress');
+    const ringPercent = document.getElementById('ringPercent');
+    const ringPhase = document.getElementById('ringPhase');
+    const ringClock = document.getElementById('ringClock');
+    const ringStatus = document.getElementById('ringStatus');
+    const ringRemaining = document.getElementById('ringRemaining');
+    const todayLabel = document.getElementById('todayLabel');
+    const tomorrowLabel = document.getElementById('tomorrowLabel');
+    const gmProgressNum = document.getElementById('gmProgressNum');
+    const gmProgressTotal = document.getElementById('gmProgressTotal');
+    const gmProgressLabel = document.getElementById('gmProgressLabel');
+    const gmStreak = document.getElementById('gmStreak');
+    const gmStreakNum = document.getElementById('gmStreakNum');
+    const gmBar = document.getElementById('gmBar');
+    const goalList = document.getElementById('goalList');
+    const emptyState = document.getElementById('emptyState');
+    const pushRemainingBtn = document.getElementById('pushRemainingBtn');
+    const goalInput = document.getElementById('goalInput');
+    const goalAddBtn = document.getElementById('goalAddBtn');
+    const goalPolishBtn = document.getElementById('goalPolishBtn');
+    const polishStatus = document.getElementById('polishStatus');
+    const tomorrowList = document.getElementById('tomorrowList');
+    const tomorrowEmpty = document.getElementById('tomorrowEmpty');
+    const tomorrowCount = document.getElementById('gmTomorrowCount');
+    const tomorrowInput = document.getElementById('tomorrowInput');
+    const tomorrowAddBtn = document.getElementById('tomorrowAddBtn');
+    const tomorrowPolishBtn = document.getElementById('tomorrowPolishBtn');
+    const tomorrowStatus = document.getElementById('tomorrowStatus');
+    const tickerStage = document.getElementById('goalTickerStage');
+    const tickerMeta = document.getElementById('goalTickerMeta');
+    let tickerItems = [];
+    let tickerIndex = 0;
+    let tickerInterval;
+    const circumference = 2 * Math.PI * 52;
+    ring.style.strokeDasharray = circumference.toFixed(4);
+    function storeGet(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
+    function storeSet(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+    function storeDelete(key) { localStorage.removeItem(key); }
+    function getTodaySystemDate(date = new Date()) { return date.toISOString().slice(0,10); }
+    function getActiveDateString() {
+      const now = new Date();
+      if (now.getHours() < DAY_BOUNDARY) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 1);
+        return getTodaySystemDate(d);
+      }
+      return getTodaySystemDate(now);
+    }
+    function getTomorrowDateString() {
+      const now = new Date();
+      if (now.getHours() < DAY_BOUNDARY) return getTodaySystemDate(now);
+      const tom = new Date(now);
+      tom.setDate(tom.getDate() + 1);
+      return getTodaySystemDate(tom);
+    }
+    function formatDisplayDate(iso) {
+      const d = new Date(iso + 'T12:00:00');
+      return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+    }
+    function nowLabel() {
+      const now = new Date();
+      return now.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+    }
+    function formatClock(date) {
+      return date.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+    }
+    function getGoals(key) { return storeGet(key) || []; }
+    function saveGoals(key, items) { storeSet(key, items); }
+    function dispatchGoalChange() { window.dispatchEvent(new CustomEvent('goals-changed')); }
+    function makeTickerItems() {
+      const today = getGoals(todayKey);
+      const total = today.length;
+      const done = today.filter(g => g.done).length;
+      const pending = today.filter(g => !g.done);
+      tickerMeta.textContent = `${done}/${total}`;
+      if (total === 0) return [{ status:'empty', text:'No goals set for today — add one to get rolling.' }];
+      if (done === total) return [{ status:'done', text:'✓ All goals done — solid day.' }];
+      if (pending.length === 0) return [{ status:'done', text:'✓ All goals done — solid day.' }];
+      return pending.map(g => ({ status:'pending', text:g.text }));
+    }
+    function renderTicker(first = false) {
+      tickerItems = makeTickerItems();
+      tickerIndex = 0;
+      if (tickerInterval) clearInterval(tickerInterval);
+      tickTicker(first);
+      tickerInterval = setInterval(() => tickTicker(), 5000);
+    }
+    function tickTicker(first = false) {
+      const item = tickerItems[tickerIndex % tickerItems.length];
+      const row = document.createElement('div');
+      row.className = 'goal-ticker-row';
+      if (!first) row.classList.add('is-entering');
+      const status = document.createElement('span');
+      status.className = 'goal-ticker-status';
+      status.dataset.status = item.status;
+      status.textContent = item.status === 'done' ? '✓' : item.status === 'pending' ? '•' : '·';
+      const text = document.createElement('span');
+      text.className = 'goal-ticker-text';
+      text.textContent = item.text;
+      row.append(status, text);
+      const current = tickerStage.querySelector('.goal-ticker-row');
+      if (current) {
+        current.classList.add('is-leaving');
+        setTimeout(() => { if (current.parentElement) current.remove(); }, 460);
+      }
+      tickerStage.appendChild(row);
+      tickerIndex = (tickerIndex + 1) % tickerItems.length;
+    }
+    function interpolateColor(p) {
+      const stops = [
+        [255,216,158], [255,205,121], [255,227,143], [255,183,106], [255,149,89],
+        [243,111,79], [226,93,122], [123,91,176], [47,58,102]
+      ];
+      const pos = Math.min(Math.max(p,0),100) / 100 * (stops.length - 1);
+      const idx = Math.floor(pos);
+      const frac = pos - idx;
+      const a = stops[idx];
+      const b = stops[Math.min(idx+1, stops.length-1)];
+      return `rgb(${Math.round(a[0] + (b[0]-a[0])*frac)}, ${Math.round(a[1] + (b[1]-a[1])*frac)}, ${Math.round(a[2] + (b[2]-a[2])*frac)})`;
+    }
+    function updateDayRing() {
+      const now = new Date();
+      const hour = now.getHours() + now.getMinutes()/60 + now.getSeconds()/3600;
+      let percent, phase, status, remain;
+      if (hour < WAKE_HOUR) {
+        percent = 0; phase = 'SLEEPING'; status = '😴 Still sleeping';
+        const until = WAKE_HOUR - hour;
+        const h = Math.floor(until); const m = Math.round((until - h)*60);
+        remain = `${h}h ${m}m until wake-up`;
+        ring.style.stroke = '#4D4B47';
+      } else if (hour >= SLEEP_HOUR) {
+        percent = 100; phase = 'PAST BEDTIME'; status = '⚠️ Past bedtime';
+        remain = 'Sleep!';
+        ring.style.stroke = '#E25D7A';
+      } else {
+        percent = ((hour - WAKE_HOUR) / (SLEEP_HOUR - WAKE_HOUR)) * 100;
+        if (percent < 25) { phase='MORNING'; status='☀️ Morning — fresh start'; }
+        else if (percent < 50) { phase='MIDDAY'; status='⛅ Midday — keep moving'; }
+        else if (percent < 75) { phase='AFTERNOON'; status='🔥 Afternoon — push it'; }
+        else if (percent < 90) { phase='EVENING'; status='🌙 Evening — wrap up'; }
+        else { phase='BEDTIME'; status='🌌 Bedtime soon'; }
+        const left = SLEEP_HOUR - hour;
+        const h = Math.floor(left); const m = Math.round((left - h)*60);
+        remain = `${h}h ${m}m awake time left`;
+        ring.style.stroke = interpolateColor(percent);
+      }
+      const offset = circumference * (1 - percent/100);
+      ring.style.strokeDashoffset = offset.toFixed(4);
+      ringPercent.textContent = percent >= 1 ? `${Math.round(percent)}%` : percent === 0 ? '—' : '0%';
+      ringPhase.textContent = phase;
+      ringClock.textContent = formatClock(now);
+      ringStatus.textContent = status;
+      ringRemaining.textContent = remain;
+    }
+    function durableKey(date) { return `goals:${date}`; }
+    function mergeUnique(dest, input) {
+      const existing = new Set(dest.map(i => i.text.trim().toLowerCase()));
+      input.forEach(item => { if (!existing.has(item.text.trim().toLowerCase())) dest.push(item); });
+    }
+    function rolloverGoals() {
+      const active = activeDate;
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('goals:'));
+      keys.forEach(key => {
+        const date = key.slice(6);
+        if (date < active) {
+          const goals = getGoals(key);
+          const undone = goals.filter(g => !g.done).map(g => ({ text:g.text, done:false, queued:g.queued }));
+          if (undone.length) {
+            const todayList = getGoals(active);
+            mergeUnique(todayList, undone);
+            saveGoals(active, todayList);
+          }
+          localStorage.removeItem(key);
+        }
+      });
+    }
+    function updateStreak() {
+      const state = storeGet('goal_streak_v1') || { count:0, lastProcessedDate:'' };
+      let count = state.count || 0;
+      let current = state.lastProcessedDate || '';
+      const active = activeDate;
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('goals:')).map(k => k.slice(6)).sort();
+      keys.forEach(date => {
+        if (date <= current || date >= active) return;
+        const goals = getGoals(`goals:${date}`);
+        if (!goals.length) return;
+        if (goals.every(g => g.done)) count += 1; else count = 0;
+        current = date;
+      });
+      storeSet('goal_streak_v1', { count, lastProcessedDate: current });
+      gmStreakNum.textContent = count;
+      gmStreak.classList.toggle('active', count > 0);
+    }
+    function buildGoalRow(goal, idx, listKey, readOnly) {
+      const row = document.createElement('li');
+      row.className = 'goal-row';
+      if (goal.done) row.classList.add('done');
+      if (goal.queued) row.classList.add('queued');
+      row.draggable = true;
+      row.dataset.index = idx;
+      const handle = document.createElement('div'); handle.className = 'goal-handle'; handle.textContent = '⠿';
+      const checkbox = document.createElement('button'); checkbox.type='button'; checkbox.className='goal-checkbox';
+      checkbox.title = readOnly ? 'Activates at 6 AM tomorrow' : 'Mark done';
+      checkbox.innerHTML = '&nbsp;';
+      if (goal.done) checkbox.classList.add('checked');
+      if (readOnly) checkbox.disabled = true;
+      checkbox.addEventListener('click', () => {
+        if (readOnly) return;
+        const goals = getGoals(listKey);
+        goals[idx].done = !goals[idx].done;
+        if (goals[idx].done) goals[idx].doneAt = Date.now(); else delete goals[idx].doneAt;
+        saveGoals(listKey, goals); renderAll();
+      });
+      const text = document.createElement('div'); text.className = 'goal-text'; text.textContent = goal.text;
+      text.contentEditable = 'false';
+      text.addEventListener('click', () => {
+        if (text.isContentEditable) return;
+        text.contentEditable = 'true';
+        text.focus();
+        document.execCommand('selectAll', false, null);
+      });
+      text.addEventListener('keydown', (event) => {
+        if (!text.isContentEditable) return;
+        if (event.key === 'Enter') { event.preventDefault(); text.blur(); }
+        if (event.key === 'Escape') { text.textContent = goal.text; text.blur(); }
+      });
+      text.addEventListener('blur', () => {
+        if (!text.isContentEditable) return;
+        const updated = text.textContent.trim();
+        if (updated && updated !== goal.text) {
+          const goals = getGoals(listKey);
+          goals[idx].text = updated;
+          saveGoals(listKey, goals);
+        } else {
+          text.textContent = goal.text;
+        }
+        text.contentEditable = 'false';
+      });
+      const queueBtn = document.createElement('button');
+      queueBtn.type='button'; queueBtn.className='gm-queue-btn'; queueBtn.textContent='☆';
+      queueBtn.title = readOnly ? 'Disabled for tomorrow' : 'Queue this goal';
+      if (goal.queued) queueBtn.classList.add('active');
+      if (readOnly) queueBtn.disabled = true;
+      queueBtn.addEventListener('click', () => {
+        if (readOnly) return; const goals = getGoals(listKey); goals[idx].queued = !goals[idx].queued; saveGoals(listKey, goals); queueBtn.classList.toggle('active', goals[idx].queued); row.classList.toggle('queued', goals[idx].queued); row.animate([{ transform:'scale(1)'},{ transform:'scale(1.015)', background:'rgba(242,192,99,0.32)'},{ transform:'scale(1)' }], { duration: 480, easing:'ease-out' }); renderAll(); });
+      const del = document.createElement('button'); del.type='button'; del.className='goal-delete'; del.textContent='×'; del.title='Delete goal';
+      del.addEventListener('click', () => {
+        const goals = getGoals(listKey); goals.splice(idx,1); saveGoals(listKey, goals); renderAll(); });
+      row.append(handle, checkbox, text, queueBtn, del);
+      row.addEventListener('dragstart', event => { event.dataTransfer.setData('text/plain', idx); row.style.opacity='0.4'; });
+      row.addEventListener('dragend', () => { row.style.opacity=''; });
+      row.addEventListener('dragover', event => { event.preventDefault(); row.style.borderColor='rgba(242,192,99,0.6)'; });
+      row.addEventListener('dragleave', () => { row.style.borderColor='rgba(255,255,255,0.06)'; });
+      row.addEventListener('drop', event => {
+        event.preventDefault(); row.style.borderColor='rgba(255,255,255,0.06)'; const from = Number(event.dataTransfer.getData('text/plain')); const to = idx; if (Number.isFinite(from)) {
+          const goals = getGoals(listKey); const [moved] = goals.splice(from,1); goals.splice(to,0,moved); saveGoals(listKey, goals); renderAll(); }
+      });
+      return row;
+    }
+    function renderList(listEl, emptyEl, key, readOnly) {
+      const goals = getGoals(key);
+      listEl.innerHTML = '';
+      if (!goals.length) { emptyEl.hidden = false; return; } else { emptyEl.hidden = true; }
+      let visible = goals;
+      let hiddenCount = 0;
+      const showMore = listEl.dataset.showMore === 'true';
+      if (goals.length > 5 && !showMore) { visible = goals.slice(0,5); hiddenCount = goals.length - 5; }
+      visible.forEach((goal, idx) => listEl.append(buildGoalRow(goal, idx, key, readOnly)));
+      if (hiddenCount) {
+        const more = document.createElement('div'); more.className='show-more'; more.textContent=`Show ${hiddenCount} more ⯆`;
+        more.addEventListener('click', () => { listEl.dataset.showMore='true'; renderAll(); }); listEl.append(more);
+      }
+      if (showMore && goals.length > 5) {
+        const extra = goals.slice(5);
+        extra.forEach((goal, idx) => listEl.append(buildGoalRow(goal, idx + 5, key, readOnly)));
+        const less = document.createElement('div'); less.className='show-more'; less.textContent='Show less ⯅'; less.addEventListener('click', () => { listEl.dataset.showMore='false'; renderAll(); }); listEl.append(less);
+      }
+    }
+    function updateTodayHeader() {
+      const goals = getGoals(todayKey);
+      const total = goals.length;
+      const done = goals.filter(g => g.done).length;
+      const progressLabel = total === 0 ? 'no goals yet' : done === total ? 'all done — solid day' : 'complete';
+      gmProgressNum.textContent = total === 0 ? '0' : done;
+      gmProgressTotal.textContent = `/ ${total}`;
+      gmProgressLabel.textContent = progressLabel;
+      gmBar.innerHTML = '';
+      goals.forEach(goal => { const seg = document.createElement('div'); seg.className = 'gm-bar-seg'; if (goal.done) seg.classList.add('gm-bar-seg-done'); gmBar.append(seg);} );
+      document.getElementById('todayCard').classList.toggle('gm-all-done', total > 0 && done === total);
+      pushRemainingBtn.hidden = goals.every(g => g.done) || goals.length === 0;
+    }
+    function updateTomorrowCount() {
+      const goals = getGoals(tomorrowKey); const text = goals.length === 1 ? '1 planned' : `${goals.length} planned`; tomorrowCount.textContent = text;
+    }
+    function renderAll() {
+      todayLabel.textContent = `Today — ${formatDisplayDate(activeDate)}`;
+      tomorrowLabel.textContent = `Plan tomorrow — ${formatDisplayDate(tomorrowDate)}`;
+      updateTodayHeader();
+      updateTomorrowCount();
+      renderList(goalList, emptyState, todayKey, false);
+      renderList(tomorrowList, tomorrowEmpty, tomorrowKey, true);
+      renderTicker();
+    }
+    function addGoal(input, key, statusEl, reload) {
+      const text = input.value.trim(); if (!text) return; const goals = getGoals(key); goals.push({ text, done:false, queued:false }); saveGoals(key, goals); input.value=''; if (statusEl) statusEl.textContent=''; reload(); }
+    function polishGoal(input, key, statusEl, reload) {
+      const text = input.value.trim(); if (!text) return; if (!ANTHROPIC_API_KEY) {
+        addGoal(input,key,statusEl,reload); statusEl.textContent='Polish needs an Anthropic API key — added as-typed.'; setTimeout(() => { statusEl.textContent=''; }, 3500); return;
+      }
+      try {
+        const payload = { model:'claude-sonnet-4-5', max_tokens:1000, messages:[{ role:'user', content:`Rewrite this goal into a single concise task without extra explanation: ${text}` }] };
+        fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:{ 'Content-Type':'application/json','x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' }, body: JSON.stringify(payload) })
+          .then(r => r.json())
+          .then(data => {
+            const reply = data?.completion || text;
+            const parsed = reply.trim().replace(/^"|"$/g,'');
+            const goals = getGoals(key); goals.push({ text: parsed, done:false, queued:false }); saveGoals(key, goals); input.value=''; reload();
+          })
+          .catch(() => { addGoal(input,key,statusEl,reload); statusEl.textContent='Polish failed — added as-typed.'; setTimeout(() => { statusEl.textContent=''; }, 3500); });
+      } catch (err) { addGoal(input,key,statusEl,reload); statusEl.textContent='Polish failed — added as-typed.'; setTimeout(() => { statusEl.textContent=''; }, 3500); }
+    }
+    function pushRemaining() {
+      const todayGoals = getGoals(todayKey);
+      const remaining = todayGoals.filter(g => !g.done).map(g => ({ text: g.text, done: false, queued: false }));
+      if (!remaining.length) return;
+      if (!confirm('Move remaining unchecked goals to tomorrow?')) return;
+      const tomorrowGoals = getGoals(tomorrowKey);
+      mergeUnique(tomorrowGoals, remaining);
+      saveGoals(tomorrowKey, tomorrowGoals);
+      saveGoals(todayKey, todayGoals.filter(g => g.done));
+      renderAll();
+    }
+    function attachHandlers() {
+      goalAddBtn.addEventListener('click', () => addGoal(goalInput, todayKey, polishStatus, renderAll));
+      goalPolishBtn.addEventListener('click', () => polishGoal(goalInput, todayKey, polishStatus, renderAll));
+      tomorrowAddBtn.addEventListener('click', () => addGoal(tomorrowInput, tomorrowKey, tomorrowStatus, renderAll));
+      tomorrowPolishBtn.addEventListener('click', () => polishGoal(tomorrowInput, tomorrowKey, tomorrowStatus, renderAll));
+      [goalInput, tomorrowInput].forEach(input => input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const btn = input === goalInput ? goalAddBtn : tomorrowAddBtn; btn.click(); } }));
+      pushRemainingBtn.addEventListener('click', pushRemaining);
+      window.addEventListener('goals-changed', () => { tickerIndex = 0; renderTicker(); });
+    }
+    const activeDate = getActiveDateString();
+    const tomorrowDate = getTomorrowDateString();
+    const todayKey = durableKey(activeDate);
+    const tomorrowKey = durableKey(tomorrowDate);
+    rolloverGoals();
+    updateStreak();
+    attachHandlers();
+    renderAll();
+    updateDayRing();
+    setInterval(updateDayRing, 60*1000);
+  </script>
+</body>
+</html>
