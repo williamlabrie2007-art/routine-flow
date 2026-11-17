@@ -1,1 +1,2 @@
 streamlink>=6.0
+websockets>=15

@@ -14,6 +14,7 @@ log = logging.getLogger("clipbot.chat")
 
 TWITCH_IRC_HOST = "irc.chat.twitch.tv"
 TWITCH_IRC_PORT = 6697
+TWITCH_WS_URL = "wss://irc-ws.chat.twitch.tv:443"
 
 
 @dataclass
@@ -75,40 +76,100 @@ def parse_line(line: str, now: float | None = None) -> ChatMessage | None:
     return ChatMessage(ts=ts, user=user, text=text, tags=tags)
 
 
+class _TcpConn:
+    """Raw IRC over TCP/TLS."""
+
+    def __init__(self, host: str, port: int, use_tls: bool):
+        self.host, self.port, self.use_tls = host, port, use_tls
+
+    async def open(self):
+        ctx = ssl.create_default_context() if self.use_tls else None
+        self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(self.host, self.port, ssl=ctx), 15)
+
+    async def send(self, line: str):
+        self.writer.write((line + "\r\n").encode())
+        await self.writer.drain()
+
+    async def lines(self) -> list[str]:
+        raw = await asyncio.wait_for(self.reader.readline(), timeout=360)  # Twitch PINGs every ~5 min
+        if not raw:
+            raise ConnectionError("chat connection closed")
+        return [raw.decode("utf-8", "replace").rstrip("\r\n")]
+
+    async def close(self):
+        if getattr(self, "writer", None) is not None:
+            self.writer.close()
+
+
+class _WsConn:
+    """IRC over WebSocket (port 443) - works behind HTTP(S) proxies (HTTPS_PROXY is honored)."""
+
+    def __init__(self, url: str = TWITCH_WS_URL):
+        self.url = url
+
+    async def open(self):
+        import websockets  # optional dependency
+
+        self.ws = await asyncio.wait_for(websockets.connect(self.url, max_size=2**22), 15)
+
+    async def send(self, line: str):
+        await self.ws.send(line)
+
+    async def lines(self) -> list[str]:
+        data = await asyncio.wait_for(self.ws.recv(), timeout=360)
+        if isinstance(data, bytes):
+            data = data.decode("utf-8", "replace")
+        return [ln for ln in data.split("\r\n") if ln]
+
+    async def close(self):
+        if getattr(self, "ws", None) is not None:
+            await self.ws.close()
+
+
+def _default_transport() -> str:
+    try:
+        import websockets  # noqa: F401
+
+        return "ws"
+    except ImportError:
+        return "tcp"
+
+
 async def chat_stream(
     channel: str,
-    host: str = TWITCH_IRC_HOST,
+    host: str | None = None,
     port: int = TWITCH_IRC_PORT,
     use_tls: bool = True,
 ) -> AsyncIterator[ChatMessage]:
-    """Yield chat messages forever, reconnecting with backoff on errors."""
+    """Yield chat messages forever, reconnecting with backoff on errors.
+
+    With no host, connects to Twitch over WebSocket (or TLS IRC if the
+    `websockets` package is missing). With a host, uses plain IRC to it.
+    """
     channel = channel.lower().lstrip("#")
     backoff = 1.0
     while True:
-        writer = None
+        if host is None and _default_transport() == "ws":
+            conn = _WsConn()
+        else:
+            conn = _TcpConn(host or TWITCH_IRC_HOST, port, use_tls)
         try:
-            ctx = ssl.create_default_context() if use_tls else None
-            reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port, ssl=ctx), 15)
+            await conn.open()
             nick = f"justinfan{random.randint(10000, 99999)}"
             for cmd in ("CAP REQ :twitch.tv/tags twitch.tv/commands", "PASS SCHMOOPIIE", f"NICK {nick}", f"JOIN #{channel}"):
-                writer.write((cmd + "\r\n").encode())
-            await writer.drain()
-            log.info("connected to chat #%s as %s", channel, nick)
+                await conn.send(cmd)
+            log.info("connected to chat #%s as %s (%s)", channel, nick, type(conn).__name__[1:4].lower())
             backoff = 1.0
             while True:
-                raw = await asyncio.wait_for(reader.readline(), timeout=360)  # Twitch PINGs every ~5 min
-                if not raw:
-                    raise ConnectionError("chat connection closed")
-                line = raw.decode("utf-8", "replace").rstrip("\r\n")
-                if line.startswith("PING"):
-                    writer.write(("PONG" + line[4:] + "\r\n").encode())
-                    await writer.drain()
-                    continue
-                if " RECONNECT" in line:
-                    raise ConnectionError("server asked us to reconnect")
-                msg = parse_line(line)
-                if msg is not None:
-                    yield msg
+                for line in await conn.lines():
+                    if line.startswith("PING"):
+                        await conn.send("PONG" + line[4:])
+                        continue
+                    if " RECONNECT" in line:
+                        raise ConnectionError("server asked us to reconnect")
+                    msg = parse_line(line)
+                    if msg is not None:
+                        yield msg
         except asyncio.CancelledError:
             raise
         except Exception as e:  # noqa: BLE001 - keep the bot alive
@@ -116,5 +177,7 @@ async def chat_stream(
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 60)
         finally:
-            if writer is not None:
-                writer.close()
+            try:
+                await conn.close()
+            except Exception:  # noqa: BLE001
+                pass

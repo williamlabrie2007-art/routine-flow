@@ -12,7 +12,7 @@ from collections import Counter, deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from .chat import TWITCH_IRC_HOST, TWITCH_IRC_PORT, ChatMessage, chat_stream
+from .chat import TWITCH_IRC_PORT, ChatMessage, chat_stream
 from .clipper import cut_clip, list_segments, range_is_recorded
 from .detector import Spike, SpikeDetector
 from .recorder import Recorder
@@ -48,7 +48,7 @@ class Config:
     streamlink_args: list[str] = field(default_factory=list)
     # testing / advanced
     input_url: str | None = None
-    irc_host: str = TWITCH_IRC_HOST
+    irc_host: str | None = None  # None = Twitch (WebSocket)
     irc_port: int = TWITCH_IRC_PORT
     irc_tls: bool = True
 
