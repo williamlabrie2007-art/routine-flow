@@ -92,7 +92,7 @@ class Recorder:
         r, w = os.pipe()
         sl = await asyncio.create_subprocess_exec(
             "streamlink", "--stdout", "--loglevel", "warning",
-            "--twitch-disable-ads", *self.streamlink_args,
+            *self.streamlink_args,
             f"https://twitch.tv/{self.channel}", self.quality,
             stdout=w,
         )

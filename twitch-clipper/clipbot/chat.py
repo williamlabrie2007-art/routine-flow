@@ -158,7 +158,7 @@ async def chat_stream(
             nick = f"justinfan{random.randint(10000, 99999)}"
             for cmd in ("CAP REQ :twitch.tv/tags twitch.tv/commands", "PASS SCHMOOPIIE", f"NICK {nick}", f"JOIN #{channel}"):
                 await conn.send(cmd)
-            log.info("connected to chat #%s as %s (%s)", channel, nick, type(conn).__name__[1:4].lower())
+            log.info("connected to chat #%s as %s (%s)", channel, nick, "websocket" if isinstance(conn, _WsConn) else "irc")
             backoff = 1.0
             while True:
                 for line in await conn.lines():
