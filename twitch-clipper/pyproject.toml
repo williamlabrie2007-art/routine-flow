@@ -1,0 +1,12 @@
+[project]
+name = "clipbot"
+version = "0.1.0"
+description = "Record a Twitch stream, count the chat, and clip every spike"
+requires-python = ">=3.10"
+dependencies = ["streamlink>=6.0"]
+
+[project.scripts]
+clipbot = "clipbot.__main__:main"
+
+[tool.setuptools]
+packages = ["clipbot"]
