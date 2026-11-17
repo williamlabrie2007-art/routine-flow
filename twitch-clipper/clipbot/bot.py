@@ -54,13 +54,18 @@ class Config:
 
 
 WORD_RE = re.compile(r"[\w']{2,}", re.UNICODE)
+STOPWORDS = set("""
+a an and are as at be but by can do for from get got had has have he her him his how i i'm if in is it it's
+just like me my no not of on or our out so that that's the their them then there they this to up was we
+what when who why will with would you your yeah yes im its dont don't thats u ur he's she she's
+""".split())
 
 
 def summarize(messages: list[ChatMessage], n: int = 5) -> tuple[list[tuple[str, int]], int]:
     """Most used emotes/words (one vote per user per token) and unique chatters."""
     votes: Counter[str] = Counter()
     for m in messages:
-        tokens = set(m.emotes) or set(WORD_RE.findall(m.text))
+        tokens = set(m.emotes) or {w for w in WORD_RE.findall(m.text) if w.lower() not in STOPWORDS}
         votes.update(tokens)
     return votes.most_common(n), len({m.user for m in messages})
 
